@@ -92,7 +92,7 @@ export default function App() {
   const [giftIndex, setGiftIndex] = useState(0);
 
   // Burayı doğru yıl ile güncelle
-  const startDate = new Date("2025-03-16T00:00:00");
+  const startDate = new Date("2026-03-16T00:00:00");
 
   useEffect(() => {
     const interval = setInterval(() => setNow(new Date()), 1000);
