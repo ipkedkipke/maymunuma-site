@@ -42,9 +42,14 @@ const terminalScript = [
   "access granted",
 ];
 
+const finalMessageText =
+  "Maymunum, üzgün olsan da yalnız değilsin. Aklımın her an sende olduğunu, seni ne kadar çok özlediğimi ve yanında olmayı ne kadar istediğimi bil. Seninle güldüğüm zamanları, sana sarılmayı, sana dokunmayı çok seviyorum. Uzakta olsan da kalbimin en özel yerindesin.";
+
+const clickHeartPalette = ["💜", "💖", "💗", "🩷", "💞", "✨"];
+
 export default function App() {
   const [started, setStarted] = useState(false);
-  const [phase, setPhase] = useState("intro"); // intro | quiz | memory | decrypt | final
+  const [phase, setPhase] = useState("intro");
   const [quizIndex, setQuizIndex] = useState(0);
   const [selected, setSelected] = useState(null);
   const [quizScore, setQuizScore] = useState(0);
@@ -66,6 +71,8 @@ export default function App() {
   const [holdSecret, setHoldSecret] = useState(false);
   const [isHolding, setIsHolding] = useState(false);
   const [holdProgress, setHoldProgress] = useState(0);
+
+  const [typedFinalText, setTypedFinalText] = useState("");
 
   const holdTimerRef = useRef(null);
   const holdIntervalRef = useRef(null);
@@ -118,14 +125,32 @@ export default function App() {
     return () => clearInterval(interval);
   }, [decrypting]);
 
+  useEffect(() => {
+    if (phase !== "final" || !secretVisible) return;
+    setTypedFinalText("");
+    let i = 0;
+    const interval = setInterval(() => {
+      i += 1;
+      setTypedFinalText(finalMessageText.slice(0, i));
+      if (i >= finalMessageText.length) clearInterval(interval);
+    }, 22);
+    return () => clearInterval(interval);
+  }, [phase, secretVisible]);
+
   const handleBackgroundClick = (e) => {
     const id = Date.now() + Math.random();
+    const emoji =
+      clickHeartPalette[Math.floor(Math.random() * clickHeartPalette.length)];
+
     const newHeart = {
       id,
       x: e.clientX,
       y: e.clientY,
-      size: 18 + Math.random() * 12,
+      size: 18 + Math.random() * 14,
+      emoji,
+      rotate: -18 + Math.random() * 36,
     };
+
     setClickHearts((prev) => [...prev, newHeart]);
 
     setTimeout(() => {
@@ -133,21 +158,21 @@ export default function App() {
     }, 1200);
   };
 
-  const makeBurst = () => {
+  const makeBurst = (count = 24) => {
     const cx = window.innerWidth / 2;
     const cy = window.innerHeight / 2;
 
-    const pieces = Array.from({ length: 24 }).map((_, i) => {
-      const angle = (Math.PI * 2 * i) / 24;
-      const distance = 90 + Math.random() * 140;
+    const pieces = Array.from({ length: count }).map((_, i) => {
+      const angle = (Math.PI * 2 * i) / count;
+      const distance = 90 + Math.random() * 170;
       return {
         id: Date.now() + Math.random() + i,
         x: cx,
         y: cy,
         dx: Math.cos(angle) * distance,
         dy: Math.sin(angle) * distance,
-        size: 18 + Math.random() * 18,
-        emoji: i % 5 === 0 ? "✨" : "💜",
+        size: 18 + Math.random() * 22,
+        emoji: i % 6 === 0 ? "✨" : i % 5 === 0 ? "🩷" : "💜",
       };
     });
 
@@ -155,7 +180,7 @@ export default function App() {
 
     setTimeout(() => {
       setBurstHearts([]);
-    }, 1600);
+    }, 1700);
   };
 
   const answerQuestion = (index) => {
@@ -229,7 +254,7 @@ export default function App() {
       setHoldSecret(true);
       setIsHolding(false);
       setHoldProgress(100);
-      makeBurst();
+      makeBurst(40);
     }, 1200);
   };
 
@@ -313,11 +338,11 @@ export default function App() {
 
         @keyframes clickFloat {
           0% {
-            transform: translate(-50%, -50%) scale(0.9);
+            transform: translate(-50%, -50%) scale(0.9) rotate(var(--rot));
             opacity: 1;
           }
           100% {
-            transform: translate(-50%, -130px) scale(1.5);
+            transform: translate(-50%, -130px) scale(1.5) rotate(var(--rot));
             opacity: 0;
           }
         }
@@ -385,11 +410,19 @@ export default function App() {
           animation: burstOut 1.5s ease forwards;
           z-index: 80;
         }
+
+        .typing-cursor::after {
+          content: "▋";
+          display: inline-block;
+          margin-left: 4px;
+          color: #a855f7;
+          animation: shimmer 1s linear infinite;
+        }
       `}</style>
 
       <div className="floating-heart" style={{ top: 90, left: 50, animationDelay: "0s" }}>💜</div>
       <div className="floating-heart" style={{ top: 160, right: 70, animationDelay: "0.7s" }}>✨</div>
-      <div className="floating-heart" style={{ top: 260, left: 90, animationDelay: "1.3s" }}>💜</div>
+      <div className="floating-heart" style={{ top: 260, left: 90, animationDelay: "1.3s" }}>🩷</div>
       <div className="floating-heart" style={{ top: 360, right: 110, animationDelay: "1.9s" }}>🌙</div>
 
       {clickHearts.map((h) => (
@@ -400,9 +433,10 @@ export default function App() {
             left: h.x,
             top: h.y,
             fontSize: h.size,
+            ["--rot"]: `${h.rotate}deg`,
           }}
         >
-          💜
+          {h.emoji}
         </div>
       ))}
 
@@ -470,8 +504,7 @@ export default function App() {
               LoveOS başlatılmaya hazır
             </h2>
             <p style={{ color: "#645c6d", lineHeight: 1.8 }}>
-              Bu sadece tatlı bir sayfa değil. İçinde mini oyunlar, sahte bir
-              terminal, sürpriz bir final ve sana özel gizli bir mesaj var.
+              Bu sadece tatlı bir sayfa değil. BU benim sigmalığım.
             </p>
             <button
               className="main-button"
@@ -745,19 +778,17 @@ export default function App() {
                 </h2>
 
                 <p
+                  className={typedFinalText.length < finalMessageText.length ? "typing-cursor" : ""}
                   style={{
                     maxWidth: 650,
                     margin: "0 auto",
                     color: "#5e5768",
                     lineHeight: 1.95,
                     fontSize: 18,
+                    minHeight: 160,
                   }}
                 >
-                  Maymunum, üzgün olsan da yalnız değilsin. Aklımın her an sende
-                  olduğunu, seni ne kadar çok özlediğimi ve yanında olmayı ne
-                  kadar istediğimi bil. Seninle güldüğüm zamanları, sana
-                  sarılmayı, sana dokunmayı çok seviyorum. Uzakta olsan da
-                  kalbimin en özel yerindesin.
+                  {typedFinalText}
                 </p>
 
                 <p
@@ -891,7 +922,7 @@ export default function App() {
               style={{ ...shellButton, marginTop: 18 }}
               onClick={closeHoldSecret}
             >
-              Kapat
+              tamam fasülyem
             </button>
           </div>
         </div>
