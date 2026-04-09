@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function shuffle(array) {
   const arr = [...array];
@@ -60,6 +60,16 @@ export default function App() {
   const [decryptProgress, setDecryptProgress] = useState(0);
   const [secretVisible, setSecretVisible] = useState(false);
 
+  const [clickHearts, setClickHearts] = useState([]);
+  const [burstHearts, setBurstHearts] = useState([]);
+
+  const [holdSecret, setHoldSecret] = useState(false);
+  const [isHolding, setIsHolding] = useState(false);
+  const [holdProgress, setHoldProgress] = useState(0);
+
+  const holdTimerRef = useRef(null);
+  const holdIntervalRef = useRef(null);
+
   const cards = useMemo(() => {
     const base = [
       { id: 1, emoji: "💜" },
@@ -107,6 +117,46 @@ export default function App() {
     }, 80);
     return () => clearInterval(interval);
   }, [decrypting]);
+
+  const handleBackgroundClick = (e) => {
+    const id = Date.now() + Math.random();
+    const newHeart = {
+      id,
+      x: e.clientX,
+      y: e.clientY,
+      size: 18 + Math.random() * 12,
+    };
+    setClickHearts((prev) => [...prev, newHeart]);
+
+    setTimeout(() => {
+      setClickHearts((prev) => prev.filter((h) => h.id !== id));
+    }, 1200);
+  };
+
+  const makeBurst = () => {
+    const cx = window.innerWidth / 2;
+    const cy = window.innerHeight / 2;
+
+    const pieces = Array.from({ length: 24 }).map((_, i) => {
+      const angle = (Math.PI * 2 * i) / 24;
+      const distance = 90 + Math.random() * 140;
+      return {
+        id: Date.now() + Math.random() + i,
+        x: cx,
+        y: cy,
+        dx: Math.cos(angle) * distance,
+        dy: Math.sin(angle) * distance,
+        size: 18 + Math.random() * 18,
+        emoji: i % 5 === 0 ? "✨" : "💜",
+      };
+    });
+
+    setBurstHearts(pieces);
+
+    setTimeout(() => {
+      setBurstHearts([]);
+    }, 1600);
+  };
 
   const answerQuestion = (index) => {
     if (selected !== null) return;
@@ -163,6 +213,39 @@ export default function App() {
     window.location.reload();
   };
 
+  const startHolding = () => {
+    if (holdSecret) return;
+    setIsHolding(true);
+    setHoldProgress(0);
+
+    holdIntervalRef.current = setInterval(() => {
+      setHoldProgress((prev) => {
+        const next = prev + 4;
+        return next >= 100 ? 100 : next;
+      });
+    }, 48);
+
+    holdTimerRef.current = setTimeout(() => {
+      setHoldSecret(true);
+      setIsHolding(false);
+      setHoldProgress(100);
+      makeBurst();
+    }, 1200);
+  };
+
+  const stopHolding = () => {
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    if (holdIntervalRef.current) clearInterval(holdIntervalRef.current);
+
+    setIsHolding(false);
+    setHoldProgress((prev) => (prev >= 100 ? 100 : 0));
+  };
+
+  const closeHoldSecret = () => {
+    setHoldSecret(false);
+    setHoldProgress(0);
+  };
+
   const shellButton = {
     border: "none",
     background: "linear-gradient(135deg, #8b5cf6, #d946ef)",
@@ -187,6 +270,7 @@ export default function App() {
 
   return (
     <div
+      onClick={handleBackgroundClick}
       style={{
         minHeight: "100vh",
         background: "linear-gradient(to bottom, #f5f3ff, #fdf4ff, #ffffff)",
@@ -227,6 +311,28 @@ export default function App() {
           100% { background-position: 200% 0; }
         }
 
+        @keyframes clickFloat {
+          0% {
+            transform: translate(-50%, -50%) scale(0.9);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(-50%, -130px) scale(1.5);
+            opacity: 0;
+          }
+        }
+
+        @keyframes burstOut {
+          0% {
+            transform: translate(0px, 0px) scale(0.8);
+            opacity: 1;
+          }
+          100% {
+            transform: translate(var(--dx), var(--dy)) scale(1.4);
+            opacity: 0;
+          }
+        }
+
         .floating-heart {
           position: absolute;
           font-size: 28px;
@@ -265,12 +371,56 @@ export default function App() {
           background-size: 200% 100%;
           animation: shimmer 1.4s linear infinite;
         }
+
+        .click-heart {
+          position: fixed;
+          pointer-events: none;
+          animation: clickFloat 1.2s ease forwards;
+          z-index: 60;
+        }
+
+        .burst-heart {
+          position: fixed;
+          pointer-events: none;
+          animation: burstOut 1.5s ease forwards;
+          z-index: 80;
+        }
       `}</style>
 
       <div className="floating-heart" style={{ top: 90, left: 50, animationDelay: "0s" }}>💜</div>
       <div className="floating-heart" style={{ top: 160, right: 70, animationDelay: "0.7s" }}>✨</div>
       <div className="floating-heart" style={{ top: 260, left: 90, animationDelay: "1.3s" }}>💜</div>
       <div className="floating-heart" style={{ top: 360, right: 110, animationDelay: "1.9s" }}>🌙</div>
+
+      {clickHearts.map((h) => (
+        <div
+          key={h.id}
+          className="click-heart"
+          style={{
+            left: h.x,
+            top: h.y,
+            fontSize: h.size,
+          }}
+        >
+          💜
+        </div>
+      ))}
+
+      {burstHearts.map((h) => (
+        <div
+          key={h.id}
+          className="burst-heart"
+          style={{
+            left: h.x,
+            top: h.y,
+            fontSize: h.size,
+            ["--dx"]: `${h.dx}px`,
+            ["--dy"]: `${h.dy}px`,
+          }}
+        >
+          {h.emoji}
+        </div>
+      ))}
 
       <div style={{ maxWidth: 980, margin: "0 auto", textAlign: "center", position: "relative", zIndex: 1 }}>
         <div
@@ -326,7 +476,8 @@ export default function App() {
             <button
               className="main-button"
               style={{ ...shellButton, marginTop: 10 }}
-              onClick={() => {
+              onClick={(e) => {
+                e.stopPropagation();
                 setStarted(true);
                 setShowTerminal(true);
                 setPhase("quiz");
@@ -434,7 +585,10 @@ export default function App() {
                       <button
                         key={i}
                         className="choice-button"
-                        onClick={() => answerQuestion(i)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          answerQuestion(i);
+                        }}
                         style={{
                           display: "block",
                           margin: "12px auto",
@@ -492,7 +646,10 @@ export default function App() {
                       <button
                         key={card.uid}
                         className="memory-card"
-                        onClick={() => flipCard(card)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          flipCard(card);
+                        }}
                         style={{
                           aspectRatio: "1 / 1",
                           border: "none",
@@ -519,7 +676,10 @@ export default function App() {
                   <button
                     className="main-button"
                     style={{ ...shellButton, marginTop: 8 }}
-                    onClick={() => setPhase("decrypt")}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setPhase("decrypt");
+                    }}
                   >
                     Gizli Dosyayı Aç
                   </button>
@@ -540,7 +700,8 @@ export default function App() {
                   <button
                     className="main-button"
                     style={{ ...shellButton, marginTop: 10 }}
-                    onClick={() => {
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setDecryptProgress(0);
                       setDecrypting(true);
                     }}
@@ -611,8 +772,67 @@ export default function App() {
                   geçmiş olsun aşkkkk, nane çayı allll 🌿💜
                 </p>
 
-                <div style={{ marginTop: 24 }}>
-                  <button className="main-button" style={shellButton} onClick={restart}>
+                <div style={{ marginTop: 22, maxWidth: 420, marginInline: "auto" }}>
+                  <p style={{ color: "#6b6474", marginBottom: 8, fontWeight: 700 }}>
+                    Bonus sürpriz için butona uzun bas 💜
+                  </p>
+
+                  <div
+                    style={{
+                      height: 10,
+                      borderRadius: 999,
+                      background: "#ede9fe",
+                      overflow: "hidden",
+                      marginBottom: 12,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${holdProgress}%`,
+                        height: "100%",
+                        background: "linear-gradient(to right, #8b5cf6, #d946ef)",
+                        transition: isHolding ? "width 0.04s linear" : "width 0.2s ease",
+                      }}
+                    />
+                  </div>
+
+                  <button
+                    className="main-button"
+                    style={{
+                      ...shellButton,
+                      transform: isHolding ? "scale(1.04)" : "scale(1)",
+                    }}
+                    onMouseDown={(e) => {
+                      e.stopPropagation();
+                      startHolding();
+                    }}
+                    onMouseUp={(e) => {
+                      e.stopPropagation();
+                      stopHolding();
+                    }}
+                    onMouseLeave={stopHolding}
+                    onTouchStart={(e) => {
+                      e.stopPropagation();
+                      startHolding();
+                    }}
+                    onTouchEnd={(e) => {
+                      e.stopPropagation();
+                      stopHolding();
+                    }}
+                  >
+                    Uzun Bas
+                  </button>
+                </div>
+
+                <div style={{ marginTop: 20 }}>
+                  <button
+                    className="main-button"
+                    style={shellButton}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      restart();
+                    }}
+                  >
                     Baştan Oyna
                   </button>
                 </div>
@@ -621,6 +841,61 @@ export default function App() {
           </>
         )}
       </div>
+
+      {holdSecret && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(30, 20, 40, 0.62)",
+            backdropFilter: "blur(8px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 120,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              width: "min(92vw, 520px)",
+              background: "white",
+              borderRadius: 28,
+              padding: 30,
+              textAlign: "center",
+              boxShadow: "0 20px 50px rgba(0,0,0,0.22)",
+              animation: "fadeUp 0.4s ease",
+            }}
+          >
+            <div style={{ fontSize: 48, marginBottom: 6 }}>💜✨🌿</div>
+            <h2 style={{ color: "#7c3aed", marginTop: 0 }}>
+              dayanamayıp uzun bastın
+            </h2>
+            <p style={{ color: "#5b5566", lineHeight: 1.8, fontSize: 17 }}>
+              ben de sana daha fazla dayanamadım maymunum 💜
+            </p>
+            <p
+              style={{
+                color: "#d946ef",
+                fontWeight: 800,
+                fontSize: 22,
+                marginTop: 14,
+              }}
+            >
+              geçmiş olsun aşkkkk, nane çayı allll 🌿💜
+            </p>
+
+            <button
+              className="main-button"
+              style={{ ...shellButton, marginTop: 18 }}
+              onClick={closeHoldSecret}
+            >
+              Kapat
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
